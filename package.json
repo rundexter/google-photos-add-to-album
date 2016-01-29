@@ -1,12 +1,16 @@
 {
-    "name": "google-photos-add-to-album",
-    "version": "0.0.1",
-    "description": "",
-    "main": "index.js",
-    "author": "Justin Fargione",
-    "license": "ISC",
-    "private": true,
-    "dependencies": {
-        "lodash": "^3.9.3"
-    }
+  "name": "google-photos-add-to-album",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "author": "Justin Fargione",
+  "license": "ISC",
+  "private": true,
+  "dependencies": {
+    "lodash": "^3.9.3",
+    "mime-types": "^2.1.9",
+    "q": "^1.4.1",
+    "request": "^2.69.0",
+    "tmp": "0.0.28"
+  }
 }

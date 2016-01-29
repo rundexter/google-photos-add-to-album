@@ -22,5 +22,9 @@
         }
       */
     ],
+    "providers": [{
+        "name": "google",
+        "scopes": "https://picasaweb.google.com/data/"
+    }],
     "title": "Google Photos: Add to Album" /* Required.A display name for the module */
 }
