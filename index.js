@@ -4,6 +4,7 @@ var _ = require('lodash')
     , tmp = require('tmp')
     , request = require('request')
     , mimeTypes = require('mime-types')
+    , xml2js = require('xml2js')
 ;
 module.exports = {
     /**
@@ -15,40 +16,63 @@ module.exports = {
     run: function(step, dexter) {
         var self = this
             , googleId = 'default' //Magic name that uses the access token user's ID
-            , album = step.input('album').first()
+            , album = step.input('album').first().toLowerCase()
             , token = dexter.provider('google').credentials('access_token')
         ;
-        step.input('file').each(function(file) {
-            var fname = require('path').parse(file.path).base;
-            self.files.get(file, function(err, buffer) { 
-                if(err) {
-                    self.fail(err);
-                } else {
-                   self.upload(token, googleId, album, fname, buffer, function(err, data) {
-                       if(err) {
-                           return self.fail(err);
-                       }
-                       return self.complete();
-                   });
+        this.albums(token, googleId, function(err, data) {
+            var albumId = null;
+            if(err) {
+                return self.fail(err);
+            }
+            _.each(data.feed.entry, function(entry) {
+                var title = entry.title[0].toLowerCase();
+                if(title == album) {
+                    albumId = entry['gphoto:id'][0];
+                    return false;
                 }
+            });
+            if(!albumId) {
+                return self.fail('Album not found');
+            }
+            step.input('file').each(function(file) {
+                var fname = require('path').parse(file.path).base;
+                self.files.get(file, function(err, buffer) { 
+                    if(err) {
+                        self.fail(err);
+                    } else {
+                       self.upload(token, googleId, albumId, fname, buffer, function(err, data) {
+                           if(err) {
+                               return self.fail(err);
+                           }
+                           return self.complete();
+                       });
+                    }
+                });
             });
         });
     }
-    , albums: function(token, user) {
-        var headers = [
-                'GData-Version: 2'
-                , 'Authorization: Bearer ' + token
-            ]
-            , readBuffer = new streamBuffers.ReadableStreamBuffer()
-            , meta = [
-                '<entry xmlns="http://www.w3.org/2005/Atom">',
-                '   <title>' + filename + '</title>',
-                '   <summary>Migration from Dropbox</summary>',
-                '   <category scheme="http://schemas.google.com/g/2005#kind',
-                '       term="http://schemas.google.com/photos/2007#photo"/>',
-                '</entry>'
-            ].join("\n")
+    , albums: function(token, user, callback) {
+        var headers = {
+                'GData-Version': 2
+                , 'Authorization': 'Bearer ' + token
+                , 'Content-Length': 0
+            }
             , url = "https://picasaweb.google.com/data/feed/api/user/" + user
+            , self = this
+        ;
+        request
+            .get(url, {
+                headers: headers
+            }, function(err, resp, body) {
+                if(err) {
+                    return callback(err, null);
+                }
+                if(resp.statusCode !== 200) {
+                    self.log('Invalid response', { response: response, body: body });
+                    return callback(new Error('Bad response, status code ' + resp.statusCode));
+                }
+                xml2js.parseString(body, callback);
+            });
         ;
     }
     , upload: function(token, user, album, filename, buffer, callback) {
