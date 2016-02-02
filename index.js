@@ -1,10 +1,8 @@
 var _ = require('lodash')
-    , q = require('q')
-    , fs = require('fs')
-    , tmp = require('tmp')
     , request = require('request')
     , mimeTypes = require('mime-types')
     , xml2js = require('xml2js')
+    , path = require('path')
 ;
 module.exports = {
     /**
@@ -18,11 +16,20 @@ module.exports = {
             , googleId = 'default' //Magic name that uses the access token user's ID
             , album = step.input('album').first().toLowerCase()
             , token = dexter.provider('google').credentials('access_token')
+            , files = step.input('file')
         ;
+        if(files.length === 0) {
+            this.log('No files to process: skipping');
+            return this.complete();
+        }
+
         self.log('Fetching albums');
         this.albums(token, googleId, function(err, data) {
-            var albumId = null;
-            console.log('Fetched albums');
+            var albumId = null
+                , counter = 0
+                , success = 0
+                , errors= []
+            ;
             if(err) {
                 return self.fail(err);
             }
@@ -39,23 +46,38 @@ module.exports = {
             if(!albumId) {
                 return self.fail('Album not found');
             }
-            self.log('Uploading ' + step.input('file').length + ' photo(s)');
-            step.input('file').each(function(file) {
-                var fname = require('path').parse(file.path).base;
+            self.log('Uploading ' + files.length + ' photo(s)');
+            files.each(function(file) {
+                var fname = path.parse(file.path).base;
                 self.files.get(file, function(err, buffer) { 
                     if(err) {
-                        self.fail(err);
+                        errors.push(err);
+                        counter ++;
+                        self.checkDone(files.length, counter, success, errors);
                     } else {
                        self.upload(token, googleId, albumId, fname, buffer, function(err, data) {
                            if(err) {
-                               return self.fail(err);
+                               errors.push(err);
+                           } else {
+                               success ++;
                            }
-                           return self.complete();
+                           counter ++;
+                           self.checkDone(files.length, counter, success, errors);
                        });
                     }
                 });
             });
         });
+    }
+    , checkDone: function(max, counter, success, err) {
+        if(counter === max) {
+            if(err.length === 0) {
+                this.complete();
+            } else {
+                this.log('Encountered upload errors', { errors: err });
+                this.fail('Failed uploading ' + err.length + ' of ' + max + ' files');
+            }
+        }
     }
     , albums: function(token, user, callback) {
         var headers = {
