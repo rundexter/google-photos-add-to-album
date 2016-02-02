@@ -24,6 +24,9 @@ module.exports = {
             if(err) {
                 return self.fail(err);
             }
+            self.log("Looking for " + album + "' in albums", {
+                albums: data.feed.entry
+            });
             _.each(data.feed.entry, function(entry) {
                 var title = entry.title[0].toLowerCase();
                 if(title == album) {
@@ -34,6 +37,7 @@ module.exports = {
             if(!albumId) {
                 return self.fail('Album not found');
             }
+            self.log('Uploading ' + self.input('file').length + ' photo(s)');
             step.input('file').each(function(file) {
                 var fname = require('path').parse(file.path).base;
                 self.files.get(file, function(err, buffer) { 
@@ -68,7 +72,7 @@ module.exports = {
                     return callback(err, null);
                 }
                 if(resp.statusCode !== 200) {
-                    self.log('Invalid response', { response: response, body: body });
+                    self.log('Invalid response', { response: resp, body: body });
                     return callback(new Error('Bad response, status code ' + resp.statusCode));
                 }
                 xml2js.parseString(body, callback);
