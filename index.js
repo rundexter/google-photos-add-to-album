@@ -48,7 +48,8 @@ module.exports = {
             }
             self.log('Uploading ' + files.length + ' photo(s)');
             files.each(function(file) {
-                var fname = path.parse(file.path).base;
+                //0.10, which Lambda uses, doesn't have parse
+                var fname = (path.parse) ? path.parse(file.path).base : path.basename(file.path);
                 self.files.get(file, function(err, buffer) { 
                     if(err) {
                         errors.push(err);
