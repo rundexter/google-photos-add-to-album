@@ -23,7 +23,6 @@ module.exports = {
             return this.complete();
         }
 
-        self.log('Fetching albums');
         this.albums(token, googleId, function(err, data) {
             var albumId = null
                 , counter = 0
@@ -89,12 +88,10 @@ module.exports = {
             , url = "https://picasaweb.google.com/data/feed/api/user/" + user
             , self = this
         ;
-        self.log('Go!');
         request
             .get(url, {
                 headers: headers
             }, function(err, resp, body) {
-                self.log('Back!', { body: body, resp: resp });
                 if(err) {
                     return callback(err, null);
                 }
