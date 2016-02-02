@@ -19,8 +19,10 @@ module.exports = {
             , album = step.input('album').first().toLowerCase()
             , token = dexter.provider('google').credentials('access_token')
         ;
+        self.log('Fetching albums');
         this.albums(token, googleId, function(err, data) {
             var albumId = null;
+            console.log('Fetched albums');
             if(err) {
                 return self.fail(err);
             }
@@ -37,7 +39,7 @@ module.exports = {
             if(!albumId) {
                 return self.fail('Album not found');
             }
-            self.log('Uploading ' + self.input('file').length + ' photo(s)');
+            self.log('Uploading ' + step.input('file').length + ' photo(s)');
             step.input('file').each(function(file) {
                 var fname = require('path').parse(file.path).base;
                 self.files.get(file, function(err, buffer) { 
@@ -64,10 +66,12 @@ module.exports = {
             , url = "https://picasaweb.google.com/data/feed/api/user/" + user
             , self = this
         ;
+        self.log('Go!');
         request
             .get(url, {
                 headers: headers
             }, function(err, resp, body) {
+                self.log('Back!', { body: body, resp: resp });
                 if(err) {
                     return callback(err, null);
                 }
