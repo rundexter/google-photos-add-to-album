@@ -3,6 +3,7 @@ var _ = require('lodash')
     , mimeTypes = require('mime-types')
     , xml2js = require('xml2js')
     , path = require('path')
+    , q = require('q')
 ;
 module.exports = {
     /**
@@ -20,14 +21,11 @@ module.exports = {
         ;
         if(files.length === 0) {
             this.log('No files to process: skipping');
-            return this.complete();
+            return this.complete({});
         }
-
         this.albums(token, googleId, function(err, data) {
             var albumId = null
-                , counter = 0
-                , success = 0
-                , errors= []
+                , promises = []
             ;
             if(err) {
                 return self.fail(err);
@@ -37,7 +35,7 @@ module.exports = {
             });
             _.each(data.feed.entry, function(entry) {
                 var title = entry.title[0].toLowerCase();
-                if(title == album) {
+                if(title === album) {
                     albumId = entry['gphoto:id'][0];
                     return false;
                 }
@@ -49,35 +47,20 @@ module.exports = {
             files.each(function(file) {
                 //0.10, which Lambda uses, doesn't have parse
                 var fname = (path.parse) ? path.parse(file.path).base : path.basename(file.path);
-                self.files.get(file, function(err, buffer) { 
-                    if(err) {
-                        errors.push(err);
-                        counter ++;
-                        self.checkDone(files.length, counter, success, errors);
-                    } else {
-                       self.upload(token, googleId, albumId, fname, buffer, function(err, data) {
-                           if(err) {
-                               errors.push(err);
-                           } else {
-                               success ++;
-                           }
-                           counter ++;
-                           self.checkDone(files.length, counter, success, errors);
-                       });
-                    }
-                });
+                promises.push(
+                    self.files.get(file)
+                        .then(function(buffer) { 
+                            return q.nfapply(self.upload, [token, googleId, albumId, fname, buffer]);
+                        })
+                );
             });
+            q.all(promises)
+                .then(function(results) {
+                    self.complete({});
+                })
+                .fail(self.fail)
+            ;
         });
-    }
-    , checkDone: function(max, counter, success, err) {
-        if(counter === max) {
-            if(err.length === 0) {
-                this.complete();
-            } else {
-                this.log('Encountered upload errors', { errors: err });
-                this.fail('Failed uploading ' + err.length + ' of ' + max + ' files');
-            }
-        }
     }
     , albums: function(token, user, callback) {
         var headers = {
