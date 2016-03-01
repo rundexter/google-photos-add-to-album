@@ -4,6 +4,7 @@ var _ = require('lodash')
     , xml2js = require('xml2js')
     , path = require('path')
     , q = require('q')
+    , MAX_FILES = 30
 ;
 module.exports = {
     /**
@@ -17,16 +18,22 @@ module.exports = {
             , googleId = 'default' //Magic name that uses the access token user's ID
             , album = step.input('album').first().toLowerCase()
             , token = dexter.provider('google').credentials('access_token')
-            , files = step.input('file')
+            , files = step.input('file').toArray()
+            , startAtKey = step.config('id') + '_start'
+            , startAt = dexter.global(startAtKey, 0)
+            , endAt = startAt + MAX_FILES
+            , albumIdKey = step.config('id') + '_album'
+            , albumId = dexter.global(albumIdKey)
         ;
         if(files.length === 0) {
             this.log('No files to process: skipping');
             return this.complete({});
         }
+        dexter.setGlobal(startAtKey, endAt);
+        if(albumId) {
+            this.processFiles(files, startAt, endAt, albumId, googleId, token);
+        }
         this.albums(token, googleId, function(err, data) {
-            var albumId = null
-                , promises = []
-            ;
             if(err) {
                 return self.fail(err);
             }
@@ -43,24 +50,36 @@ module.exports = {
             if(!albumId) {
                 return self.fail('Album not found');
             }
-            self.log('Uploading ' + files.length + ' photo(s)');
-            files.each(function(file) {
-                //0.10, which Lambda uses, doesn't have parse
-                var fname = (path.parse) ? path.parse(file.path).base : path.basename(file.path);
-                promises.push(
-                    self.files.get(file)
-                        .then(function(buffer) { 
-                            return q.nfapply(self.upload, [token, googleId, albumId, fname, buffer]);
-                        })
-                );
-            });
-            q.all(promises)
-                .then(function(results) {
-                    self.complete({});
-                })
-                .fail(self.fail)
-            ;
+            dexter.setGlobal(albumIdKey, albumId);
+            self.processFiles(files, startAt, endAt, albumId, googleId, token);
         });
+    }
+    , processFiles: function(files, startAt, endAt, albumId, userId, token) {
+        var chunk = _.slice(files, startAt, endAt)
+            , promises = []
+            , self = this
+        ;
+        self.log('Uploading ' + chunk.length + ' of ' + files.length + ' photo(s)');
+        _.each(chunk, function(file) {
+            //0.10, which Lambda uses, doesn't have parse
+            var fname = (path.parse) ? path.parse(file.path).base : path.basename(file.path);
+            promises.push(
+                self.files.get(file)
+                    .then(function(buffer) { 
+                        return q.nfapply(self.upload, [token, userId, albumId, fname, buffer]);
+                    })
+            );
+        });
+        q.all(promises)
+            .then(function(results) {
+                if(files.length > startAt + chunk.length) {
+                    self.replay();    
+                } else {
+                    self.complete({});
+                }
+            })
+            .fail(self.fail)
+        ;
     }
     , albums: function(token, user, callback) {
         var headers = {
