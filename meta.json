@@ -2,10 +2,12 @@
     "inputs": [
         {
             "id": "file",
-            "title":"File"
+            "title":"File",
+            "description": "A file from a Dexter file provider (Dropbox, etc.)"
         }, {
             "id": "album",
-            "title": "Album"
+            "title": "Album",
+            "description": "Name of the album to upload to"
         }
     ],
     "outputs": [],

@@ -1,10 +1,10 @@
 {
   "name": "google-photos-add-to-album",
   "version": "0.0.1",
-  "description": "Copy files from Dropbox to a Google Photos album",
+  "description": "Copy files to a Google Photos album",
   "main": "index.js",
-  "author": "Justin Fargione",
-  "license": "ISC",
+  "author": "Run Dexter, Inc.",
+  "license": "MIT",
   "private": true,
   "dependencies": {
     "lodash": "^3.9.3",
