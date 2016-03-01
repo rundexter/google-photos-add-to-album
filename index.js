@@ -4,7 +4,7 @@ var _ = require('lodash')
     , xml2js = require('xml2js')
     , path = require('path')
     , q = require('q')
-    , MAX_FILES = 30
+    , MAX_FILES = 20
 ;
 module.exports = {
     /**
