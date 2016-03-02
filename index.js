@@ -4,7 +4,7 @@ var _ = require('lodash')
     , xml2js = require('xml2js')
     , path = require('path')
     , q = require('q')
-    , MAX_FILES = 20
+    , MAX_FILES = 30
 ;
 module.exports = {
     /**
@@ -32,34 +32,38 @@ module.exports = {
         dexter.setGlobal(startAtKey, endAt);
         if(albumId) {
             this.processFiles(files, startAt, endAt, albumId, googleId, token);
-        }
-        this.albums(token, googleId, function(err, data) {
-            if(err) {
-                return self.fail(err);
-            }
-            self.log("Looking for " + album + "' in albums", {
-                albums: data.feed.entry
-            });
-            _.each(data.feed.entry, function(entry) {
-                var title = entry.title[0].toLowerCase();
-                if(title === album) {
-                    albumId = entry['gphoto:id'][0];
-                    return false;
+        } else {
+            this.albums(token, googleId, function(err, data) {
+                if(err) {
+                    return self.fail(err);
                 }
+                self.log("Looking for '" + album + "' in albums", {
+                    albums: _.map(data.feed.entry, function(entry) {
+                        return entry.title[0];
+                    })
+                });
+                _.each(data.feed.entry, function(entry) {
+                    var title = entry.title[0].toLowerCase();
+                    if(title === album) {
+                        albumId = entry['gphoto:id'][0];
+                        return false;
+                    }
+                });
+                if(!albumId) {
+                    return self.fail('Album not found');
+                }
+                dexter.setGlobal(albumIdKey, albumId);
+                self.processFiles(files, startAt, endAt, albumId, googleId, token);
             });
-            if(!albumId) {
-                return self.fail('Album not found');
-            }
-            dexter.setGlobal(albumIdKey, albumId);
-            self.processFiles(files, startAt, endAt, albumId, googleId, token);
-        });
+        }
     }
     , processFiles: function(files, startAt, endAt, albumId, userId, token) {
         var chunk = _.slice(files, startAt, endAt)
+            , realEnd = startAt + chunk.length
             , promises = []
             , self = this
         ;
-        self.log('Uploading ' + chunk.length + ' of ' + files.length + ' photo(s)');
+        self.log('Uploading photos ' + (startAt + 1) + ' to ' + realEnd + ' of ' + files.length + ' photo(s)');
         _.each(chunk, function(file) {
             //0.10, which Lambda uses, doesn't have parse
             var fname = (path.parse) ? path.parse(file.path).base : path.basename(file.path);
@@ -72,13 +76,13 @@ module.exports = {
         });
         q.all(promises)
             .then(function(results) {
-                if(files.length > startAt + chunk.length) {
+                if(files.length > realEnd) {
                     self.replay();    
                 } else {
                     self.complete({});
                 }
             })
-            .fail(self.fail)
+            .fail(self.fail.bind(self))
         ;
     }
     , albums: function(token, user, callback) {
